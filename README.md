@@ -121,7 +121,7 @@ $ pwd
 /home/hyejin/codyssey/workstation
 ```
 
-<!-- [터미널 기본 조작] (images/01-terminal-1.png)
+![터미널 기본 조작](images/01-terminal-1.png)
 
 ### 5-2. 권한 실습
 
@@ -152,7 +152,7 @@ drwx------ 700 secret_dir
 | note.txt (파일) | `-rw-r--r--` 644 | `-rwxr-xr-x` 755 → 644 원복 |
 | secret_dir (디렉토리) | `drwxr-xr-x` 755 | `drwx------` 700 |
 
-<!-- [권한 변경]: images/03-chmod.png -->
+! [권한 변경](images/03-chmod.png) 
 
 ### 5-3. Docker 설치 점검
 
@@ -172,7 +172,8 @@ Server:
 ```
 
 `Server:` 정보가 출력되므로 Docker 데몬이 정상 동작한다.
-<!-- [설치 점검]: images/04-Docker.png -->
+
+![설치 점검](images/04-Docker.png)
 
 ### 5-4. 컨테이너 실행 실습
 
@@ -281,7 +282,7 @@ $ docker images | grep my-web
 my-web:1.0   88a2d5f010f0   93.6MB   26.3MB
 ```
 
-<!-- [Docker 빌드] (images/06-docker-build.png) -->
+![Docker 빌드](images/06-docker-build.png)
 
 ### 5-7. 포트 매핑 접속
 
