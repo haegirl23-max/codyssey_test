@@ -152,7 +152,7 @@ drwx------ 700 secret_dir
 | note.txt (파일) | `-rw-r--r--` 644 | `-rwxr-xr-x` 755 → 644 원복 |
 | secret_dir (디렉토리) | `drwxr-xr-x` 755 | `drwx------` 700 |
 
-! [권한 변경](images/03-chmod.png) 
+![권한 변경](images/03-chmod.png) 
 
 ### 5-3. Docker 설치 점검
 
