@@ -1,46 +1,53 @@
 # 내 컴퓨터에 개발용 '작업실' 꾸미기
 
-> 코디세이 AI 올인원 1기 입학 연수 미션 — 개발 워크스테이션 구축 기록
-> (이 파일은 틀입니다. `<!-- -->` 안내문과 `TODO` 자리를 실제 명령·출력으로 채우고, 파일명을 README.md로 바꿔 저장소 최상단에 두세요.)
+> 코디세이 AI 올인원 1기 입학 연수 미션 — Windows(WSL2) 개발 워크스테이션 구축 기록
 
 ## 1. 프로젝트 개요
 
-- 목표: 터미널·Docker·Git을 직접 세팅하고, 누가 실행해도 같은 결과가 나오는 개발 환경을 구성한다.
-- 수행 범위: 터미널 조작 → 권한 → Docker 점검/운영 → Dockerfile 커스텀 이미지 → 포트 매핑 → 바인드 마운트/볼륨 → Git/GitHub 연동
+터미널, Docker, Git을 직접 세팅해 "내 컴퓨터에서만 되는" 문제 없이 누구나 같은 방식으로 실행할 수 있는 개발 환경을 구성했다.
+
+- 터미널로 작업 폴더 구성, 파일 조작, 권한 변경
+- Docker 설치 점검, 컨테이너 실행/운영
+- Dockerfile로 nginx 기반 커스텀 웹 서버 이미지 제작, 포트 매핑 접속
+- 바인드 마운트(변경 반영)와 볼륨(데이터 영속성) 검증
+- Git 설정, GitHub 저장소 push, VSCode GitHub 연동
 
 ## 2. 실행 환경
 
 | 항목 | 값 |
 | --- | --- |
-| Host OS | Windows TODO (예: Windows 11 Pro 23H2) |
-| Linux 환경 | WSL2 Ubuntu TODO |
-| Shell / 터미널 | bash / Windows Terminal |
-| Docker | TODO (`docker --version` 결과) |
-| Git | TODO (`git --version` 결과) |
+| Host OS | Windows |
+| Linux 환경 | WSL2 Ubuntu 26.04.1 LTS |
+| Shell / 터미널 | bash (`/bin/bash`) / Windows Terminal |
+| Docker | Docker Desktop, Docker version 29.9.2 (WSL Integration 사용) |
+| Git | git version 2.53.0 |
+| 에디터 | VSCode + WSL 확장 |
 
 ```bash
 $ cat /etc/os-release | head -2
-TODO
+PRETTY_NAME="Ubuntu 26.04.1 LTS"
+NAME="Ubuntu"
 $ echo $SHELL
-TODO
+/bin/bash
 $ docker --version
-TODO
+Docker version 29.9.2, build a82e528
 $ git --version
-TODO
+git version 2.53.0
 ```
 
 ## 3. 수행 체크리스트
 
-- [ ] 터미널 기본 조작 및 폴더 구성
-- [ ] 권한 변경 실습 (파일 1, 디렉토리 1)
-- [ ] Docker 설치/점검 (version, info)
-- [ ] hello-world 실행 / ubuntu 컨테이너 진입
-- [ ] Docker 운영 명령 (images, ps -a, logs, stats)
-- [ ] Dockerfile 커스텀 이미지 빌드/실행
-- [ ] 포트 매핑 접속 (2회)
-- [ ] 바인드 마운트 반영
-- [ ] 볼륨 영속성
-- [ ] Git 설정 + VSCode GitHub 연동
+- [x] 터미널 기본 조작 및 폴더 구성
+- [x] 권한 변경 실습 (파일 1, 디렉토리 1)
+- [x] Docker 설치/점검 (version, info)
+- [x] hello-world 실행 / ubuntu 컨테이너 진입
+- [x] Docker 운영 명령 (images, ps -a, logs, stats)
+- [x] attach / exec 차이 관찰
+- [x] Dockerfile 커스텀 이미지 빌드/실행
+- [x] 포트 매핑 접속 (8080, 8081 2회)
+- [x] 바인드 마운트 반영
+- [x] 볼륨 영속성
+- [x] Git 설정 + GitHub push + VSCode GitHub 연동
 
 ## 4. 저장소 구조
 
@@ -49,8 +56,9 @@ TODO
 ├── README.md
 ├── Dockerfile
 ├── app/
-│   └── index.html
-└── images/        # 스크린샷
+│   └── index.html      # nginx로 서비스할 정적 페이지
+├── images/             # 증거 스크린샷
+└── practice/           # 터미널·권한 실습 파일
 ```
 
 ## 5. 수행 로그
@@ -58,164 +66,393 @@ TODO
 ### 5-1. 터미널 기본 조작
 
 ```bash
-$ pwd
-TODO
 $ mkdir -p ~/codyssey/workstation
 $ cd ~/codyssey/workstation
+$ pwd
+/home/hyejin/codyssey/workstation
 $ ls -la
-TODO
-# (생성 / 빈 파일 / 내용 확인 / 숨김 파일 / 복사 / 이름변경 / 이동 / 삭제 출력 붙이기)
+total 8
+drwxr-xr-x 2 hyejin hyejin 4096 Nov  4 13:04 .
+drwxr-xr-x 3 hyejin hyejin 4096 Nov  4 13:04 ..
+
+$ mkdir practice && cd practice
+$ touch empty.txt
+$ echo "hello codyssey" > note.txt
+$ cat note.txt
+hello codyssey
+$ touch .hidden
+$ ls
+empty.txt  note.txt
+$ ls -la
+total 12
+drwxr-xr-x 2 hyejin hyejin 4096 Nov  4 13:05 .
+drwxr-xr-x 3 hyejin hyejin 4096 Nov  4 13:04 ..
+-rw-r--r-- 1 hyejin hyejin    0 Nov  4 13:05 .hidden
+-rw-r--r-- 1 hyejin hyejin    0 Nov  4 13:04 empty.txt
+-rw-r--r-- 1 hyejin hyejin   15 Nov  4 13:04 note.txt
 ```
+
+- `ls`에는 보이지 않던 `.hidden`, `.`, `..`가 `ls -la`에서 보인다 (숨김 파일 확인).
+- `empty.txt`는 0바이트(빈 파일), `note.txt`는 15바이트("hello codyssey" 14자 + 줄바꿈).
+
+```bash
+$ cp note.txt note_copy.txt              # 복사
+$ mv note_copy.txt renamed.txt           # 이름 변경
+$ ls -la
+...
+-rw-r--r-- 1 hyejin hyejin   15 Nov  4 13:05 renamed.txt
+$ mv renamed.txt backup/                 # 이동 (backup은 mkdir로 생성)
+$ ls -la backup
+total 12
+drwxr-xr-x 2 hyejin hyejin 4096 Nov  4 13:13 .
+drwxr-xr-x 3 hyejin hyejin 4096 Nov  4 13:13 ..
+-rw-r--r-- 1 hyejin hyejin   15 Nov  4 13:05 renamed.txt
+$ rm backup/renamed.txt                  # 파일 삭제
+$ rmdir backup                           # 빈 디렉토리 삭제
+$ ls -la
+total 12
+drwxr-xr-x 2 hyejin hyejin 4096 Nov  4 13:14 .
+drwxr-xr-x 3 hyejin hyejin 4096 Nov  4 13:04 ..
+-rw-r--r-- 1 hyejin hyejin    0 Nov  4 13:05 .hidden
+-rw-r--r-- 1 hyejin hyejin    0 Nov  4 13:04 empty.txt
+-rw-r--r-- 1 hyejin hyejin   15 Nov  4 13:04 note.txt
+$ cd ..
+$ pwd
+/home/hyejin/codyssey/workstation
+```
+
+<!-- 캡처: images/01-terminal-1.png, images/02-terminal-2.png -->
 
 ### 5-2. 권한 실습
 
 ```bash
 $ ls -l note.txt
-TODO   # 변경 전
+-rw-r--r-- 1 hyejin hyejin 15 Nov  4 13:04 note.txt     # 변경 전 644
 $ chmod 755 note.txt
 $ ls -l note.txt
-TODO   # 변경 후
+-rwxr-xr-x 1 hyejin hyejin 15 Nov  4 13:04 note.txt     # 변경 후 755
+$ chmod 644 note.txt
+$ ls -l note.txt
+-rw-r--r-- 1 hyejin hyejin 15 Nov  4 13:04 note.txt     # 원복
 
+$ mkdir secret_dir
 $ ls -ld secret_dir
-TODO   # 변경 전
+drwxr-xr-x 2 hyejin hyejin 4096 Nov  4 13:19 secret_dir # 변경 전 755
 $ chmod 700 secret_dir
 $ ls -ld secret_dir
-TODO   # 변경 후
+drwx------ 2 hyejin hyejin 4096 Nov  4 13:19 secret_dir # 변경 후 700
+
+$ stat -c '%A %a %n' note.txt secret_dir
+-rw-r--r-- 644 note.txt
+drwx------ 700 secret_dir
 ```
+
+| 대상 | 변경 전 | 변경 후 |
+| --- | --- | --- |
+| note.txt (파일) | `-rw-r--r--` 644 | `-rwxr-xr-x` 755 → 644 원복 |
+| secret_dir (디렉토리) | `drwxr-xr-x` 755 | `drwx------` 700 |
+
+<!-- 캡처: images/03-chmod.png -->
 
 ### 5-3. Docker 설치 점검
 
 ```bash
 $ docker --version
-TODO
-$ docker info
-TODO   # Server 부분 발췌
+Docker version 29.9.2, build a82e528
+$ docker info | grep -A 8 "Server:"
+Server:
+ Containers: 1
+  Running: 0
+  Paused: 0
+  Stopped: 1
+ Images: 1
+ Server Version: 29.9.2
+ Storage Driver: overlayfs
+  driver-type: io.containerd.snapshotter.v1
 ```
+
+`Server:` 정보가 출력되므로 Docker 데몬이 정상 동작한다.
 
 ### 5-4. 컨테이너 실행 실습
 
 ```bash
 $ docker run hello-world
-TODO
+...
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+...
+
 $ docker run -it --name my-ubuntu ubuntu bash
-root@...:/# ls
-TODO
-root@...:/# echo "inside container"
-TODO
+root@2110c6fe125f:/# echo "inside container"
+inside container
+root@2110c6fe125f:/# cat /etc/os-release | head -2
+PRETTY_NAME="Ubuntu 26.04.1 LTS"
+NAME="Ubuntu"
+root@2110c6fe125f:/# ls /
+bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+root@2110c6fe125f:/# exit
 ```
 
-**attach vs exec 관찰 결과**: TODO (직접 관찰한 내용 2~3줄)
+프롬프트가 `root@2110c6fe125f`(컨테이너 ID)로 바뀌고, 호스트의 `/home/hyejin` 파일이 보이지 않는 격리된 환경임을 확인했다.
+
+**attach vs exec 관찰 결과**
+
+```bash
+$ docker start my-ubuntu
+$ docker exec -it my-ubuntu bash
+root@2110c6fe125f:/# exit
+$ docker ps
+CONTAINER ID   IMAGE    COMMAND   CREATED          STATUS          PORTS   NAMES
+2110c6fe125f   ubuntu   "bash"    33 minutes ago   Up 23 minutes           my-ubuntu   # exec 후: 유지
+
+$ docker attach my-ubuntu
+root@2110c6fe125f:/# exit
+$ docker ps -a
+CONTAINER ID   IMAGE         COMMAND    CREATED             STATUS                       NAMES
+2110c6fe125f   ubuntu        "bash"     36 minutes ago      Exited (0) 54 seconds ago    my-ubuntu   # attach 후: 종료
+8f2a797e14f3   hello-world   "/hello"   About an hour ago   Exited (0) About an hour ago vibrant_elgamal
+```
+
+- `docker exec`는 컨테이너 안에 bash를 **하나 더** 실행한다. 그 bash에서 exit해도 메인 프로세스는 그대로라 컨테이너가 Up 상태로 유지된다.
+- `docker attach`는 컨테이너의 **메인 프로세스(PID 1)**에 연결된다. 거기서 exit하면 메인 프로세스가 끝나므로 컨테이너도 Exited가 된다.
 
 ### 5-5. Docker 운영 명령
 
 ```bash
 $ docker images
-TODO
+IMAGE                ID             DISK USAGE   CONTENT SIZE
+hello-world:latest   c567b231f656   25.9kB       9.49kB
+ubuntu:latest        6a06111c3b0a   163MB        45.9MB
+
+$ docker ps
+CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES     # 실행 중인 컨테이너 없음
+
 $ docker ps -a
-TODO
-$ docker logs <컨테이너>
-TODO
+CONTAINER ID   IMAGE         COMMAND    CREATED          STATUS                     NAMES
+2110c6fe125f   ubuntu        "bash"     8 minutes ago    Exited (0) 12 seconds ago  my-ubuntu
+8f2a797e14f3   hello-world   "/hello"   48 minutes ago   Exited (0) 48 minutes ago  vibrant_elgamal
+
+$ docker logs my-ubuntu
+root@2110c6fe125f:/# ls .
+bin  boot  dev  etc ...
+root@2110c6fe125f:/# echo "inside container"
+inside container
+...
+
 $ docker stats --no-stream
-TODO
+CONTAINER ID   NAME        CPU %   MEM USAGE / LIMIT     MEM %   NET I/O         BLOCK I/O     PIDS
+2110c6fe125f   my-ubuntu   0.00%   1.707MiB / 7.663GiB   0.02%   1.17kB / 126B   422kB / 0B    1
 ```
+
+- `--name` 없이 실행한 hello-world 컨테이너는 Docker가 `vibrant_elgamal`이라는 이름을 자동으로 붙였다.
+- `docker logs`에는 컨테이너 안에서 입력한 명령과 출력이 그대로 기록된다.
 
 ### 5-6. Dockerfile 커스텀 이미지
 
-- 선택한 방식: TODO (예: (A) nginx:alpine 베이스 + 정적 콘텐츠 교체)
-- 베이스 선택 이유: TODO
+- 선택한 방식: **(A) 웹 서버 베이스 이미지 활용** — `nginx:alpine` + 정적 콘텐츠 교체
+- 베이스 선택 이유: nginx는 별도 설정 없이 정적 파일을 바로 서비스하고, alpine 버전은 용량이 작아 빌드와 실행이 빠르다.
+
+```dockerfile
+FROM nginx:alpine
+LABEL org.opencontainers.image.title="Hyejin's web"
+ENV APP_ENV=dev
+COPY app/ /usr/share/nginx/html
+HEALTHCHECK CMD wget -q -O /dev/null http://localhost/ || exit 1
+EXPOSE 80
+```
 
 | 커스텀 포인트 | 목적 |
 | --- | --- |
-| TODO (예: COPY app/) | TODO |
-| TODO (예: ENV) | TODO |
-| TODO (예: HEALTHCHECK) | TODO |
+| `LABEL` | 이미지에 제목 메타데이터를 붙여 식별하기 쉽게 함 |
+| `ENV APP_ENV=dev` | 실행 모드를 환경 변수로 주입 (설정과 코드 분리) |
+| `COPY app/ ...` | nginx 기본 페이지를 내가 만든 페이지로 교체 |
+| `HEALTHCHECK` | 30초마다 웹 서버 응답을 점검해 `docker ps`에 healthy/unhealthy 표시 |
+| `EXPOSE 80` | 컨테이너가 사용하는 포트를 문서화 |
 
 ```bash
 $ docker build -t my-web:1.0 .
-TODO
+[+] Building 4.9s (7/7) FINISHED
+ => [1/2] FROM docker.io/library/nginx:alpine@sha256:785835ea...
+ => [2/2] COPY app/ /usr/share/nginx/html
+ => exporting to image
+ => => naming to docker.io/library/my-web:1.0
+$ docker images | grep my-web
+my-web:1.0   88a2d5f010f0   93.6MB   26.3MB
 ```
+
+<!-- 캡처: images/06-docker-build.png -->
 
 ### 5-7. 포트 매핑 접속
 
 ```bash
 $ docker run -d -p 8080:80 --name my-web-8080 my-web:1.0
-$ curl http://localhost:8080
-TODO
 $ docker run -d -p 8081:80 --name my-web-8081 my-web:1.0
+$ docker ps
+CONTAINER ID   IMAGE        STATUS                    PORTS                                     NAMES
+d90747f965dd   my-web:1.0   Up 2 minutes (healthy)    0.0.0.0:8081->80/tcp, [::]:8081->80/tcp   my-web-8081
+67c68230cb46   my-web:1.0   Up 2 minutes (healthy)    0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   my-web-8080
+
+$ curl http://localhost:8080
+<!DOCTYPE html>
+<html>
+    <head><meta charset="utf-8"><title>Hyejin's Workstation</title></head>
+<body>
+    <h1>Hyejin's Dev Workstation v1</h1>
+    <p>Cody 미션 진행-Docker로 웹 서버 만들기</p>
+</body>
+</html>
 $ curl http://localhost:8081
-TODO
+(위와 동일)
+
+$ docker logs my-web-8080
+...
+::1 - - [04/Nov/2026:05:54:13 +0000] "GET / HTTP/1.1" 200 226 "-" "Wget" "-"
+172.17.0.1 - - [04/Nov/2026:05:55:05 +0000] "GET / HTTP/1.1" 200 226 "-" "curl/8.18.0" "-"
+...
 ```
 
-![8080 접속](images/port-8080.png)
-![8081 접속](images/port-8081.png)
+- 같은 이미지로 호스트 포트만 다르게(8080, 8081) 두 컨테이너를 동시에 실행했다.
+- 로그의 `"Wget"`(30초 간격)은 HEALTHCHECK, `172.17.0.1 ... curl`은 호스트에서 포트 매핑을 거쳐 들어온 요청이다.
+
+![localhost:8080 접속](images/port-8080.png)
+![localhost:8081 접속](images/port-8081.png)
 
 ### 5-8. 바인드 마운트
 
 ```bash
 $ docker run -d -p 8082:80 --name my-web-bind -v "$(pwd)/app":/usr/share/nginx/html my-web:1.0
 $ curl http://localhost:8082
-TODO   # 변경 전
-$ echo "<h1>Changed on host</h1>" > app/index.html
+...
+    <h1>Hyejin's Dev Workstation v1</h1>      # 변경 전
+...
+$ echo "<hi>changed on host (bind mount)</h1>" > app/index.html   # 호스트에서 수정
 $ curl http://localhost:8082
-TODO   # 변경 후
+<hi>changed on host (bind mount)</h1>         # 변경 후 (재빌드 없이 즉시 반영)
+$ docker exec my-web-bind cat /usr/share/nginx/html/index.html
+<hi>changed on host (bind mount)</h1>         # 컨테이너 내부 파일도 동일
 ```
+
+이미지를 다시 빌드하지 않았는데도 호스트에서 고친 파일이 컨테이너에 바로 반영됐다. 바인드 마운트 없이 실행한 8080 컨테이너는 빌드 시점에 복사된 원래 페이지를 그대로 보여준다. 실습 후 백업해 둔 원본으로 `app/index.html`을 되돌렸다.
+
+<!-- 캡처: images/08-bind-before.png, images/08-bind-after.png -->
 
 ### 5-9. 볼륨 영속성
 
 ```bash
 $ docker volume create mydata
+mydata
+$ docker volume ls
+DRIVER    VOLUME NAME
+local     mydata
+
 $ docker run -d --name vol-test -v mydata:/data ubuntu sleep infinity
-$ docker exec vol-test bash -lc "echo hi > /data/hello.txt && cat /data/hello.txt"
-TODO
-$ docker rm -f vol-test
+$ docker exec vol-test bash -c "echo 'hello volume' > /data/hello.txt"
+$ docker exec vol-test cat /data/hello.txt
+hello volume
+
+$ docker rm -f vol-test                  # 컨테이너 삭제
+vol-test
+$ docker ps -a | grep vol-test           # 출력 없음 = 완전히 삭제됨
+
 $ docker run -d --name vol-test2 -v mydata:/data ubuntu sleep infinity
 $ docker exec vol-test2 cat /data/hello.txt
-TODO   # 삭제 후에도 유지됨
+hello volume                             # 새 컨테이너에서도 데이터 유지
 ```
+
+<!-- 캡처: images/09-volume.png -->
 
 ### 5-10. Git 설정 및 GitHub 연동
 
 ```bash
 $ git config --list
-TODO   # 이메일 등 민감정보는 마스킹
+user.name=haegirl23-max
+user.email=300758409+haegirl23-max@users.noreply.github.com
+init.defaultbranch=main
+core.repositoryformatversion=0
+core.filemode=true
+core.bare=false
+core.logallrefupdates=true
+
+$ git init
+Initialized empty Git repository in /home/hyejin/codyssey/workstation/.git/
+$ git add .
+$ git commit -m "initial commit: dev workstation mission"
+[main (root-commit) f91957b] initial commit: dev workstation mission
+ 8 files changed, 236 insertions(+)
+$ git log --oneline
+f91957b (HEAD -> main) initial commit: dev workstation mission
+
+$ git remote add origin https://github.com/haegirl23-max/codyssey_test.git
+$ git push -u origin main --force
+...
+To https://github.com/haegirl23-max/codyssey_test.git
+ + 06b11c2...f91957b main -> main (forced update)
+branch 'main' set up to track 'origin/main'.
 ```
 
-![VSCode GitHub 연동](images/vscode-github.png)
+- 공개 저장소이므로 개인 이메일 대신 GitHub noreply 주소를 사용했다.
+- 인증은 GitHub 비밀번호가 아닌 Personal Access Token으로 했고, 토큰은 문서와 캡처에 남기지 않았다.
+
+![VSCode GitHub 로그인](images/vscode-github.png)
+![VSCode 소스 제어](images/vscode-source-control.png)
 
 ## 6. 검증 방법 요약
 
-| 항목 | 확인 명령 | 기대 결과 | 증거 위치 |
+| 항목 | 확인 명령 | 결과 | 증거 |
 | --- | --- | --- | --- |
-| Docker 데몬 | `docker info` | Server 정보 출력 | [5-3](#5-3-docker-설치-점검) |
-| 포트 매핑 | `curl localhost:8080` | 내 페이지 HTML | [5-7](#5-7-포트-매핑-접속) |
-| 바인드 마운트 | 호스트 수정 후 `curl` | 재빌드 없이 변경 반영 | [5-8](#5-8-바인드-마운트) |
+| Docker 데몬 | `docker info` | Server Version 29.9.2 출력 | [5-3](#5-3-docker-설치-점검) |
+| 컨테이너 실행 | `docker run hello-world` | Hello from Docker! | [5-4](#5-4-컨테이너-실행-실습) |
+| 커스텀 이미지 | `docker build` | my-web:1.0 생성, healthy | [5-6](#5-6-dockerfile-커스텀-이미지) |
+| 포트 매핑 | `curl localhost:8080/8081` + 브라우저 | 내 페이지 응답 | [5-7](#5-7-포트-매핑-접속) |
+| 바인드 마운트 | 호스트 수정 후 `curl` | 재빌드 없이 반영 | [5-8](#5-8-바인드-마운트) |
 | 볼륨 | 컨테이너 삭제 후 `cat` | 데이터 유지 | [5-9](#5-9-볼륨-영속성) |
-| Git | `git config --list` | user.name, init.defaultBranch | [5-10](#5-10-git-설정-및-github-연동) |
+| Git/GitHub | `git config --list`, `git push` | 설정 확인, push 성공 | [5-10](#5-10-git-설정-및-github-연동) |
 
 ## 7. 트러블슈팅
 
-### 문제 1: TODO
-- 문제: TODO
-- 원인 가설: TODO
-- 확인: TODO
-- 해결/대안: TODO
+### 문제 1: Ubuntu에서 Docker 데몬에 연결되지 않음
+- **문제**: `docker info` 실행 시 `The command 'docker' could not be found in this WSL 2 distro. We recommend to activate the WSL integration` 오류
+- **원인 가설**: Docker Desktop과 WSL Ubuntu의 연동이 꺼져 있어서, Windows 쪽 docker 클라이언트만 응답하고 데몬에는 접근하지 못함
+- **확인**: 플러그인 경로가 `C:\Program Files\Docker\...`로 표시됨. Docker Desktop › Settings › Resources › WSL Integration에서 Ubuntu가 꺼져 있었음
+- **해결**: Ubuntu 연동을 켜고 Apply & restart. 이후 경로가 `/usr/local/lib/docker/...`로 바뀌고 `docker info`에 Server 정보가 정상 출력됨
 
-### 문제 2: TODO
-- 문제: TODO
-- 원인 가설: TODO
-- 확인: TODO
-- 해결/대안: TODO
+### 문제 2: 컨테이너를 삭제한 뒤 볼륨 데이터가 사라진 것처럼 보임
+- **문제**: 새 컨테이너 `vol-test2`에서 `cat /data/hello.txt` 실행 시 `No such file or directory`
+- **원인 가설**: 첫 컨테이너를 만들 때 볼륨 이름을 잘못 입력해 다른 볼륨에 저장됨
+- **확인**: 첫 실행 명령이 `-v madata:/data`(mydata 오타)였음. Docker는 없는 볼륨 이름을 받으면 오류 없이 새 볼륨을 자동 생성함. `docker volume ls`에서 `madata` 볼륨을 발견했고, `madata`를 새 컨테이너에 연결하자 `hello volume`이 그대로 있었음
+- **해결**: 잘못 생성된 컨테이너와 `madata` 볼륨을 삭제하고 `mydata`로 다시 실행해 영속성 확인. Tab 자동완성으로 이름 오타를 방지
+
+### 문제 3: git push가 거부됨
+- **문제**: `git push` 시 `! [rejected] main -> main (fetch first)`
+- **원인 가설**: GitHub에서 저장소를 만들 때 자동 생성된 커밋이 원격에만 있어서, Git이 덮어쓰기를 막음
+- **확인**: GitHub 저장소 페이지에서 내가 올리지 않은 자동 생성 파일을 확인
+- **해결**: 원격 내용이 버려도 되는 자동 생성 파일뿐이라 `git push -u origin main --force`로 내 커밋을 올림. 협업 저장소라면 `git pull`로 먼저 합쳐야 함
+
+### 그 밖에 겪은 문제
+- `cat .etc/os-release` → `No such file`: `/etc`(절대 경로)를 `.etc`(상대 경로의 숨김 폴더)로 잘못 입력
+- `docker run --name my -ubuntu ...` → `unable to find user buntu`: 띄어쓰기 때문에 `-ubuntu`가 `-u buntu`(사용자 지정 옵션)로 해석됨
+- PowerShell에서 `head` 실행 오류, `wsl ~`가 `docker-desktop` 배포판으로 진입: `wsl --set-default Ubuntu`로 기본 배포판 변경
+- 닫는 따옴표 누락으로 프롬프트가 `>`로 바뀌어 대기: `Ctrl+C`로 취소 후 재입력
 
 ## 8. 개념 정리
 
-- 절대 경로 vs 상대 경로: TODO
-- 권한 r/w/x와 755·644: TODO
-- 커스텀 이미지: TODO
-- 포트 매핑이 필요한 이유: TODO
-- Docker 볼륨: TODO
-- Git vs GitHub: TODO
+- **절대 경로 vs 상대 경로**: `/home/hyejin/codyssey`처럼 `/`(루트)부터 시작하면 어디서 실행해도 같은 위치를 가리키는 절대 경로다. `practice`, `../`처럼 현재 위치를 기준으로 하면 상대 경로라서 실행 위치에 따라 결과가 달라진다. 컨테이너 안 `/`에서 `.etc/os-release`를 입력했을 때 실패한 것은 상대 경로로 해석됐기 때문이다.
+- **권한 r/w/x와 755·644**: 권한은 소유자/그룹/기타 세 자리이고, 각 자리는 r=4, w=2, x=1을 더한 값이다. 755는 소유자 rwx(7), 그룹과 기타 r-x(5)로 디렉토리나 실행 파일에 쓴다. 644는 소유자 rw-(6), 나머지 r--(4)로 일반 파일에 쓴다. 디렉토리에서 x는 들어갈 수 있는 권한(cd), r은 목록을 볼 수 있는 권한(ls)이다.
+- **커스텀 이미지**: 기존 이미지(nginx:alpine)를 `FROM`으로 가져와 그 위에 내 파일과 설정을 층(레이어)으로 쌓은 이미지다. 한 번 빌드하면 어디서 실행해도 같은 환경이 재현된다.
+- **포트 매핑이 필요한 이유**: 컨테이너는 격리된 자체 네트워크를 쓰기 때문에 컨테이너 안의 80번 포트는 호스트에서 바로 접근할 수 없다. `-p 8080:80`은 호스트 8080으로 온 요청을 컨테이너 80으로 전달한다. 호스트 포트만 다르게 하면 같은 이미지를 여러 개 동시에 띄울 수 있다.
+- **Docker 볼륨**: 컨테이너 내부 파일은 컨테이너를 지우면 함께 사라진다. 볼륨은 Docker가 컨테이너 밖에서 관리하는 저장 공간이라 컨테이너를 삭제해도 데이터가 남는다. DB 데이터처럼 보존해야 하는 것을 넣는다. 바인드 마운트는 내가 지정한 호스트 폴더를 그대로 연결하는 방식으로, 개발 중 코드 수정을 바로 반영할 때 쓴다.
+- **Git vs GitHub**: Git은 내 PC에서 파일의 변경 이력을 관리하는 로컬 버전 관리 도구다. GitHub는 Git 저장소를 온라인에 올려 공유·리뷰·협업하는 원격 플랫폼이다. Git은 인터넷 없이도 쓸 수 있고, GitHub와는 push/pull로 연결한다.
 
 ## 9. 재현 시 주의사항
 
-- Windows 사용 시 실습 폴더는 WSL 홈(`~`) 아래에 둔다. `/mnt/c`, `/mnt/d`에서는 chmod가 반영되지 않는다.
-- 토큰·비밀번호·개인 이메일은 로그와 스크린샷에서 마스킹했다.
+- Windows에서는 WSL2 Ubuntu 터미널에서 실습한다. 프롬프트가 `PS C:\...>`이면 PowerShell이므로 `wsl ~`로 Ubuntu에 들어간다.
+- `wsl ~`가 `docker-desktop`으로 들어가면 `wsl --set-default Ubuntu`로 기본 배포판을 바꾼다.
+- 실습 폴더는 WSL 홈(`~`) 아래에 둔다. `/mnt/c`, `/mnt/d` 같은 Windows 드라이브는 리눅스 권한을 지원하지 않아, 거기서 가져온 파일은 `-rwxr-xr-x`로 표시되고 chmod가 제대로 반영되지 않는다. (D드라이브에서 복사한 README.md도 755로 들어와 `chmod 644`로 바꿨다.)
+- Docker Desktop의 WSL Integration에서 Ubuntu를 켜야 Ubuntu 터미널에서 docker를 쓸 수 있다.
+- Git은 빈 디렉토리를 기록하지 않으므로 `practice/secret_dir`는 저장소에 포함되지 않는다.
+
+## 10. 보안 및 개인정보 보호
+
+- 커밋 이메일은 GitHub noreply 주소를 사용했다.
+- GitHub 인증은 Personal Access Token(만료 30일, repo 권한만)으로 했고, 토큰과 비밀번호는 문서와 캡처에 포함하지 않았다.
+- 사용이 끝난 토큰은 GitHub › Settings › Developer settings › Personal access tokens에서 삭제했다. 토큰이 노출되면 즉시 삭제하고 재발급한다.
