@@ -121,7 +121,7 @@ $ pwd
 /home/hyejin/codyssey/workstation
 ```
 
-<!-- 캡처: images/01-terminal-1.png, images/02-terminal-2.png -->
+<!-- [터미널 기본 조작] (images/01-terminal-1.png)
 
 ### 5-2. 권한 실습
 
@@ -152,7 +152,7 @@ drwx------ 700 secret_dir
 | note.txt (파일) | `-rw-r--r--` 644 | `-rwxr-xr-x` 755 → 644 원복 |
 | secret_dir (디렉토리) | `drwxr-xr-x` 755 | `drwx------` 700 |
 
-<!-- 캡처: images/03-chmod.png -->
+<!-- [권한 변경]: images/03-chmod.png -->
 
 ### 5-3. Docker 설치 점검
 
@@ -172,6 +172,7 @@ Server:
 ```
 
 `Server:` 정보가 출력되므로 Docker 데몬이 정상 동작한다.
+<!-- [설치 점검]: images/04-Docker.png -->
 
 ### 5-4. 컨테이너 실행 실습
 
@@ -280,7 +281,7 @@ $ docker images | grep my-web
 my-web:1.0   88a2d5f010f0   93.6MB   26.3MB
 ```
 
-<!-- 캡처: images/06-docker-build.png -->
+<!-- [Docker 빌드] (images/06-docker-build.png) -->
 
 ### 5-7. 포트 매핑 접속
 
@@ -334,7 +335,7 @@ $ docker exec my-web-bind cat /usr/share/nginx/html/index.html
 
 이미지를 다시 빌드하지 않았는데도 호스트에서 고친 파일이 컨테이너에 바로 반영됐다. 바인드 마운트 없이 실행한 8080 컨테이너는 빌드 시점에 복사된 원래 페이지를 그대로 보여준다. 실습 후 백업해 둔 원본으로 `app/index.html`을 되돌렸다.
 
-<!-- 캡처: images/08-bind-before.png, images/08-bind-after.png -->
+<!-- 캡처: images/08-bind-before.png, images/08-bind-after.png --->
 
 ### 5-9. 볼륨 영속성
 
@@ -358,8 +359,6 @@ $ docker run -d --name vol-test2 -v mydata:/data ubuntu sleep infinity
 $ docker exec vol-test2 cat /data/hello.txt
 hello volume                             # 새 컨테이너에서도 데이터 유지
 ```
-
-<!-- 캡처: images/09-volume.png -->
 
 ### 5-10. Git 설정 및 GitHub 연동
 
