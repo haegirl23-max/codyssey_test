@@ -47,6 +47,7 @@ git version 2.53.0
 - [x] 포트 매핑 접속 (8080, 8081 2회)
 - [x] 바인드 마운트 반영
 - [x] 볼륨 영속성
+- [x] 포트 충돌 진단과 해결
 - [x] Git 설정 + GitHub push + VSCode GitHub 연동
 
 ## 4. 저장소 구조
@@ -60,6 +61,10 @@ git version 2.53.0
 ├── images/             # 증거 스크린샷
 └── practice/           # 터미널·권한 실습 파일
 ```
+
+구성 기준:
+- 저장소 루트에 `Dockerfile`을 두어 `docker build .` 한 줄로 빌드되게 했다. 빌드에 들어가는 파일은 `app/`으로 한정해, 실습용 파일(`practice/`)이나 스크린샷(`images/`)이 이미지에 섞이지 않게 했다.
+- 증거는 `images/`에 단계 번호 순(`01-` ~ `10-`, 트러블슈팅은 `ts1-` ~ `ts3-`)으로 이름을 붙여, README의 섹션 번호와 바로 대응되게 했다.
 
 ## 5. 수행 로그
 
@@ -154,6 +159,11 @@ drwx------ 700 secret_dir
 | secret_dir (디렉토리) | `drwxr-xr-x` 755 | `drwx------` 700 |
 
 ![권한 변경](images/03-chmod.png) 
+
+각 변경의 이유:
+- `note.txt` → 755: 일반 파일에 실행 권한(x)을 붙이면 어떻게 표시되는지(`-rwxr-xr-x`, 초록색 이름) 확인하려는 실험이다.
+- `note.txt` → 644 원복: 텍스트 문서는 실행할 필요가 없으므로, 필요한 권한만 주는 최소 권한 원칙에 따라 되돌렸다.
+- `secret_dir` → 700: 그룹과 기타 사용자의 읽기·진입을 모두 막고 소유자만 쓰게 했다. 개인 설정이나 키처럼 다른 사용자가 보면 안 되는 파일을 두는 폴더에 쓰는 설정이다.
 
 ### 5-3. Docker 설치 점검
 
@@ -257,6 +267,19 @@ CONTAINER ID   NAME        CPU %   MEM USAGE / LIMIT     MEM %   NET I/O        
 - `--name` 없이 실행한 hello-world 컨테이너는 Docker가 `vibrant_elgamal`이라는 이름을 자동으로 붙였다.
 - `docker logs`에는 컨테이너 안에서 입력한 명령과 출력이 그대로 기록된다.
 
+실습에서 쓴 이미지·컨테이너 ID와 이름 (각 단계 출력에서 정리):
+
+| 구분 | ID (앞 12자리) | 이름 | 용도 |
+| --- | --- | --- | --- |
+| 이미지 | `c567b231f656` | hello-world:latest | 설치 확인 |
+| 이미지 | `6a06111c3b0a` | ubuntu:latest | 컨테이너 진입, 볼륨 실습 |
+| 이미지 | `88a2d5f010f0` | my-web:1.0 | Dockerfile로 만든 커스텀 웹 서버 |
+| 컨테이너 | `8f2a797e14f3` | vibrant_elgamal | hello-world 실행 (이름 자동 생성) |
+| 컨테이너 | `2110c6fe125f` | my-ubuntu | ubuntu 진입, attach/exec 비교 |
+| 컨테이너 | `67c68230cb46` | my-web-8080 | 포트 매핑 8080:80 |
+| 컨테이너 | `d90747f965dd` | my-web-8081 | 포트 매핑 8081:80 |
+| 컨테이너 | `27aa34fa0a0f` | vol-test2 | 볼륨 영속성 확인 |
+
 ### 5-6. Dockerfile 커스텀 이미지
 
 - 선택한 방식: **(A) 웹 서버 베이스 이미지 활용** — `nginx:alpine` + 정적 콘텐츠 교체
@@ -291,6 +314,11 @@ my-web:1.0   88a2d5f010f0   93.6MB   26.3MB
 ```
 
 ![Docker 빌드](images/06-docker-build.png)
+
+주요 지시어의 동작:
+- `HEALTHCHECK`: 옵션을 생략했으므로 기본값(30초 간격, 30초 타임아웃, 3회 연속 실패 시 unhealthy)으로 동작한다. 컨테이너 안에서 `wget`으로 `http://localhost/`에 접속해 성공하면 healthy가 된다. 실제로 `docker ps`가 `health: starting`에서 `healthy`로 바뀌었고, nginx 로그에 30초마다 `"Wget"` 요청이 찍힌 것으로 확인했다 (5-7 참고).
+- `EXPOSE 80`: "이 컨테이너는 80번을 쓴다"는 문서 역할만 하고, 포트를 실제로 열지는 않는다. 호스트에서 접속하려면 실행할 때 `-p 8080:80`으로 매핑해야 한다.
+- `ENV APP_ENV=dev`: 컨테이너 안의 환경 변수로 들어간다. `docker exec <컨테이너> env | grep APP_ENV`로 확인할 수 있다.
 
 ### 5-7. 포트 매핑 접속
 
@@ -329,6 +357,73 @@ $ docker logs my-web-8080
 
 ![localhost:8080 접속](images/port-8080.png)
 ![localhost:8081 접속](images/port-8081.png)
+
+접속 범위와 주의사항:
+- `docker ps`의 `0.0.0.0:8080->80/tcp`는 호스트의 모든 네트워크 주소에서 8080을 받는다는 뜻이다. Windows + Docker Desktop에서는 Windows의 `localhost:8080`으로 바로 접속된다.
+- 같은 네트워크의 다른 PC에서 접속하려면 `http://<내 PC의 IP>:8080`을 쓰고, Windows 방화벽에서 해당 포트의 인바운드 허용이 필요할 수 있다. 회사·학교 네트워크는 정책상 막혀 있을 수 있다.
+- 내 PC에서만 접속되게 하려면 `-p 127.0.0.1:8080:80`처럼 주소를 지정해 실행한다.
+
+### 5-7-1. 포트 충돌 진단과 해결
+
+일부러 이미 쓰고 있는 8080으로 컨테이너를 하나 더 실행해 충돌을 만들고, 원인을 찾아 해결했다.
+
+**1) 충돌 재현**
+
+```bash
+$ docker start my-web-8080
+$ docker ps
+CONTAINER ID   IMAGE        STATUS                            PORTS                                     NAMES
+67c68230cb46   my-web:1.0   Up 5 seconds (health: starting)   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   my-web-8080
+
+$ docker run -d -p 8080:80 --name port-conflict my-web:1.0
+3ef6fdd6a199a23196750c1f148f6850fcd99ffb21e2f6f060dc666a9d6b4567
+docker: Error response from daemon: failed to set up container networking: driver failed programming
+external connectivity on endpoint port-conflict (...): Bind for 0.0.0.0:8080 failed: port is already allocated
+```
+
+**2) 원인 진단: 누가 8080을 쓰고 있나**
+
+```bash
+$ docker ps --filter "publish=8080"          # 8080을 게시한 컨테이너 찾기
+CONTAINER ID   IMAGE        STATUS                    PORTS                                     NAMES
+67c68230cb46   my-web:1.0   Up 2 minutes (healthy)    0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   my-web-8080
+
+$ docker port my-web-8080                     # 그 컨테이너의 포트 매핑 확인
+80/tcp -> 0.0.0.0:8080
+80/tcp -> [::]:8080
+
+$ docker ps -a --filter "name=port-conflict"  # 실패한 컨테이너 상태 확인
+CONTAINER ID   IMAGE        CREATED         STATUS    PORTS     NAMES
+3ef6fdd6a199   my-web:1.0   2 minutes ago   Created             port-conflict
+```
+
+- 원인: `my-web-8080`이 호스트 8080을 이미 점유하고 있었다.
+- 실행은 실패했지만 컨테이너는 `Created` 상태로 남는다. 이 상태로 두면 같은 이름으로 다시 실행할 때 이름 충돌 오류가 나므로 먼저 지운다.
+
+**3) 해결: 포트를 비우고 다시 실행**
+
+```bash
+$ docker rm port-conflict                     # 실패한 컨테이너 정리
+port-conflict
+$ docker stop my-web-8080                     # 포트를 점유한 컨테이너 중지
+my-web-8080
+$ docker run -d -p 8080:80 --name port-conflict my-web:1.0
+dcf266af4cca1ba07c5744aee5acadf1bd5ed951fade1be41a893aa4bbb9f816   # 이번엔 성공
+$ docker rm -f port-conflict                  # 실습 정리
+$ docker start my-web-8080                    # 원래 상태로 복구
+```
+
+![포트 충돌 재현, 진단, 해결](images/07-port-conflict.png)
+
+해결 방법 정리:
+
+| 상황 | 방법 |
+| --- | --- |
+| 기존 컨테이너를 계속 써야 함 | 다른 호스트 포트로 실행 (`-p 8083:80`) |
+| 기존 컨테이너가 필요 없음 | `docker stop` 또는 `docker rm -f`로 포트를 비운 뒤 실행 |
+| Docker가 아닌 프로그램이 포트를 점유 | Windows PowerShell에서 `netstat -ano \| findstr :8080`으로 PID를 찾고 `tasklist /FI "PID eq <PID>"`로 프로그램 확인 후 종료. Linux에서는 `ss -ltnp \| grep 8080` |
+
+주의: `netstat ... | findstr`을 Ubuntu 터미널에서 실행하자 `netstat not found`, `findstr: command not found`가 났다. `findstr`는 Windows 전용 명령이라 PowerShell에서 실행해야 하고, Ubuntu에서는 `ss` 같은 Linux 명령을 쓴다.
 
 ### 5-8. 바인드 마운트
 
@@ -376,6 +471,26 @@ hello volume                             # 새 컨테이너에서도 데이터 �
 
 ![볼륨 영속성 검증](images/09-volume.png)
 
+볼륨 문제가 생겼을 때 확인할 점:
+- 이름 확인: `docker volume ls`로 의도한 볼륨이 맞는지 본다. 없는 이름을 `-v`에 쓰면 오류 없이 새 볼륨이 만들어진다 (트러블슈팅 문제 2).
+- 위치·드라이버 확인: `docker volume inspect mydata`로 `Driver`(기본 `local`)와 `Mountpoint`를 본다. Docker Desktop에서는 이 경로가 Docker 전용 VM 안에 있어서 Windows 탐색기나 Ubuntu에서 직접 보이지 않는다.
+- 권한 확인: 컨테이너 안에서 `ls -l /data`로 파일 소유자를 본다. 컨테이너를 root가 아닌 사용자로 실행하면 root가 만든 파일에 쓰기 권한이 없어 `Permission denied`가 날 수 있다.
+- 사용 중 확인: 컨테이너가 연결된 볼륨은 `docker volume rm`이 거부된다. `docker ps -a --filter volume=mydata`로 어떤 컨테이너가 쓰는지 찾는다.
+
+볼륨 백업/복원 절차 (권장):
+
+```bash
+# 백업: 임시 컨테이너로 볼륨 내용을 현재 폴더의 tar 파일로 묶기
+docker run --rm -v mydata:/data -v "$(pwd)":/backup ubuntu tar czf /backup/mydata-backup.tgz -C /data .
+
+# 복원: 새 볼륨을 만들고 tar 파일을 풀어 넣기
+docker volume create mydata-restore
+docker run --rm -v mydata-restore:/data -v "$(pwd)":/backup ubuntu tar xzf /backup/mydata-backup.tgz -C /data
+docker run --rm -v mydata-restore:/data ubuntu cat /data/hello.txt
+```
+
+`--rm`을 붙인 임시 컨테이너가 볼륨과 현재 폴더를 동시에 연결해 파일을 옮기는 방식이다. 백업 파일에는 데이터가 그대로 들어 있으므로 Git 저장소에 올리지 않는다.
+
 ### 5-10. Git 설정 및 GitHub 연동
 
 ```bash
@@ -415,6 +530,14 @@ branch 'main' set up to track 'origin/main'.
 ![VSCode GitHub 로그인](images/vscode-github.png)
 ![VSCode 소스 제어](images/vscode-source-control.png)
 
+push 전 보안 체크리스트:
+- [x] 저장소 공개 범위 확인: 제출용이라 Public. 개인 프로젝트나 회사 코드는 Private로 만든다.
+- [x] `git config user.email`이 noreply 주소인지 확인
+- [x] `git status`, `git diff --staged`로 올라갈 파일을 확인해 토큰·비밀번호·`.env` 같은 파일이 없는지 점검
+- [x] 스크린샷에 토큰, 비밀번호, 개인 이메일이 찍히지 않았는지 확인 (개인 Gmail이 보이는 `git config` 캡처는 제외)
+- [x] 토큰은 필요한 권한(repo)과 짧은 만료(30일)로 발급하고, 다 쓴 토큰은 삭제
+- [x] `--force` push는 혼자 쓰는 저장소에서만 사용
+
 ## 6. 검증 방법 요약
 
 | 항목 | 확인 명령 | 결과 | 증거 |
@@ -423,6 +546,7 @@ branch 'main' set up to track 'origin/main'.
 | 컨테이너 실행 | `docker run hello-world` | Hello from Docker! | [5-4](#5-4-컨테이너-실행-실습) |
 | 커스텀 이미지 | `docker build` | my-web:1.0 생성, healthy | [5-6](#5-6-dockerfile-커스텀-이미지) |
 | 포트 매핑 | `curl localhost:8080/8081` + 브라우저 | 내 페이지 응답 | [5-7](#5-7-포트-매핑-접속) |
+| 포트 충돌 | `docker ps --filter "publish=8080"`, `docker port` | 점유 컨테이너 특정 후 해제·재실행 성공 | [5-7-1](#5-7-1-포트-충돌-진단과-해결) |
 | 바인드 마운트 | 호스트 수정 후 `curl` | 재빌드 없이 반영 | [5-8](#5-8-바인드-마운트) |
 | 볼륨 | 컨테이너 삭제 후 `cat` | 데이터 유지 | [5-9](#5-9-볼륨-영속성) |
 | Git/GitHub | `git config --list`, `git push` | 설정 확인, push 성공 | [5-10](#5-10-git-설정-및-github-연동) |
@@ -463,9 +587,28 @@ branch 'main' set up to track 'origin/main'.
 ## 8. 개념 정리
 
 - **절대 경로 vs 상대 경로**: `/home/hyejin/codyssey`처럼 `/`(루트)부터 시작하면 어디서 실행해도 같은 위치를 가리키는 절대 경로다. `practice`, `../`처럼 현재 위치를 기준으로 하면 상대 경로라서 실행 위치에 따라 결과가 달라진다. 컨테이너 안 `/`에서 `.etc/os-release`를 입력했을 때 실패한 것은 상대 경로로 해석됐기 때문이다.
+    - 바인드 마운트의 호스트 경로는 `-v "$(pwd)/app":...`처럼 절대 경로로 쓴다. `-v app:/...`처럼 `/` 없이 쓰면 폴더가 아니라 `app`이라는 이름의 볼륨으로 해석된다. Windows에서는 `/mnt/c`, `/mnt/d`보다 WSL 홈(`~`) 아래 경로를 마운트해야 권한이 제대로 적용되고 파일 반영도 빠르다. 컨테이너가 고치면 안 되는 폴더는 `:ro`(읽기 전용)를 붙인다.
 - **권한 r/w/x와 755·644**: 권한은 소유자/그룹/기타 세 자리이고, 각 자리는 r=4, w=2, x=1을 더한 값이다. 755는 소유자 rwx(7), 그룹과 기타 r-x(5)로 디렉토리나 실행 파일에 쓴다. 644는 소유자 rw-(6), 나머지 r--(4)로 일반 파일에 쓴다. 디렉토리에서 x는 들어갈 수 있는 권한(cd), r은 목록을 볼 수 있는 권한(ls)이다.
+
+    | 권한 | 표기 | 주로 쓰는 대상 |
+    | --- | --- | --- |
+    | 644 | `-rw-r--r--` | 일반 파일, 웹 루트의 HTML·CSS (nginx가 읽기만 하면 됨) |
+    | 755 | `rwxr-xr-x` | 디렉토리, 실행 스크립트(`.sh`), 웹 루트 폴더 |
+    | 600 | `-rw-------` | SSH 개인키(`~/.ssh/id_ed25519`), 토큰이 든 설정 파일 |
+    | 700 | `rwx------` | `~/.ssh` 폴더처럼 나만 쓰는 디렉토리 |
+    | 777 | `rwxrwxrwx` | 모두에게 쓰기 허용. 보안상 피해야 함 |
 - **커스텀 이미지**: 기존 이미지(nginx:alpine)를 `FROM`으로 가져와 그 위에 내 파일과 설정을 층(레이어)으로 쌓은 이미지다. 한 번 빌드하면 어디서 실행해도 같은 환경이 재현된다.
+- **이미지 vs 컨테이너**: 이미지는 빌드가 끝나면 바뀌지 않는(불변, immutable) 설계도이고, 컨테이너는 그 이미지 위에 쓰기 가능한 층을 하나 얹어 실행한(가변, runtime) 인스턴스다. 컨테이너 안에서 파일을 바꿔도 이미지는 그대로이고, 컨테이너를 지우면 그 변경도 사라진다. 그래서 남겨야 할 데이터는 볼륨에 둔다.
 - **포트 매핑이 필요한 이유**: 컨테이너는 격리된 자체 네트워크를 쓰기 때문에 컨테이너 안의 80번 포트는 호스트에서 바로 접근할 수 없다. `-p 8080:80`은 호스트 8080으로 온 요청을 컨테이너 80으로 전달한다. 호스트 포트만 다르게 하면 같은 이미지를 여러 개 동시에 띄울 수 있다.
+- **Docker 네트워크 모드**: 이번 실습은 기본값인 bridge를 썼다.
+
+    | 모드 | 동작 | 포트 접근 |
+    | --- | --- | --- |
+    | bridge (기본) | 컨테이너마다 가상 네트워크와 IP(예: 172.17.0.x)를 받음 | `-p`로 매핑해야 호스트에서 접근 가능 |
+    | host | 컨테이너가 호스트 네트워크를 그대로 같이 씀 | 매핑 없이 호스트 포트를 바로 사용, 대신 격리가 약하고 포트가 겹치면 충돌 |
+    | none | 네트워크 없음 | 외부 통신 불가 |
+
+    5-7의 nginx 로그에 찍힌 `172.17.0.1`이 bridge 네트워크에서 호스트가 쓰는 주소다. Docker Desktop(Windows)에서는 host 모드가 Windows가 아니라 Docker VM의 네트워크를 가리키므로, Windows에서 접속하려면 bridge + `-p`가 일반적이다.
 - **Docker 볼륨**: 컨테이너 내부 파일은 컨테이너를 지우면 함께 사라진다. 볼륨은 Docker가 컨테이너 밖에서 관리하는 저장 공간이라 컨테이너를 삭제해도 데이터가 남는다. DB 데이터처럼 보존해야 하는 것을 넣는다. 바인드 마운트는 내가 지정한 호스트 폴더를 그대로 연결하는 방식으로, 개발 중 코드 수정을 바로 반영할 때 쓴다.
 - **Git vs GitHub**: Git은 내 PC에서 파일의 변경 이력을 관리하는 로컬 버전 관리 도구다. GitHub는 Git 저장소를 온라인에 올려 공유·리뷰·협업하는 원격 플랫폼이다. Git은 인터넷 없이도 쓸 수 있고, GitHub와는 push/pull로 연결한다.
 
@@ -476,6 +619,18 @@ branch 'main' set up to track 'origin/main'.
 - 실습 폴더는 WSL 홈(`~`) 아래에 둔다. `/mnt/c`, `/mnt/d` 같은 Windows 드라이브는 리눅스 권한을 지원하지 않아, 거기서 가져온 파일은 `-rwxr-xr-x`로 표시되고 chmod가 제대로 반영되지 않는다. (D드라이브에서 복사한 README.md도 755로 들어와 `chmod 644`로 바꿨다.)
 - Docker Desktop의 WSL Integration에서 Ubuntu를 켜야 Ubuntu 터미널에서 docker를 쓸 수 있다.
 - Git은 빈 디렉토리를 기록하지 않으므로 `practice/secret_dir`는 저장소에 포함되지 않는다.
+
+Windows(WSL2) 환경과 일반 Linux 환경의 차이:
+
+| 항목 | Windows + WSL2 + Docker Desktop (이번 실습) | 일반 Linux (예: Ubuntu 서버) |
+| --- | --- | --- |
+| Docker 설치 | Docker Desktop 설치 후 WSL Integration에서 Ubuntu 켜기 | `apt`로 Docker Engine 설치, `sudo usermod -aG docker $USER` |
+| 데몬 확인 | Docker Desktop 실행 여부 + `docker info` | `systemctl status docker` + `docker info` |
+| `localhost:8080` 접속 | Windows 브라우저에서 바로 됨 (Docker Desktop이 포워딩) | 같은 서버에서 바로 됨 |
+| 포트 점유 확인 | Windows: `netstat -ano \| findstr :8080` | `ss -ltnp \| grep 8080` |
+| 볼륨 실제 위치 | Docker VM 안이라 직접 접근 불가 | `/var/lib/docker/volumes/` (root 권한 필요) |
+| 파일 권한 | WSL 홈은 정상, `/mnt/c`·`/mnt/d`는 chmod 미반영 | 정상 |
+| 터미널 혼동 | PowerShell(`PS C:\>`)과 Ubuntu(`$`)를 구분해야 함 | 해당 없음 |
 
 ## 10. 보안 및 개인정보 보호
 
