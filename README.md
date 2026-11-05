@@ -121,7 +121,8 @@ $ pwd
 /home/hyejin/codyssey/workstation
 ```
 
-![터미널 기본 조작](images/01-terminal-1.png)
+![터미널 기본 조작 1 - 생성/이동/목록/내용 확인](images/01-terminal-1.png)
+![터미널 기본 조작 2 - 복사/이름변경/이동/삭제](images/02-terminal-2.png)
 
 ### 5-2. 권한 실습
 
@@ -195,6 +196,8 @@ bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  s
 root@2110c6fe125f:/# exit
 ```
 
+![hello-world 실행](images/05-hello-world.png)
+
 프롬프트가 `root@2110c6fe125f`(컨테이너 ID)로 바뀌고, 호스트의 `/home/hyejin` 파일이 보이지 않는 격리된 환경임을 확인했다.
 
 **attach vs exec 관찰 결과**
@@ -214,6 +217,9 @@ CONTAINER ID   IMAGE         COMMAND    CREATED             STATUS              
 2110c6fe125f   ubuntu        "bash"     36 minutes ago      Exited (0) 54 seconds ago    my-ubuntu   # attach 후: 종료
 8f2a797e14f3   hello-world   "/hello"   About an hour ago   Exited (0) About an hour ago vibrant_elgamal
 ```
+
+![exec 후 유지, attach 시작](images/05-exec-attach.png)
+![attach 후 Exited](images/05-attach-exited.png)
 
 - `docker exec`는 컨테이너 안에 bash를 **하나 더** 실행한다. 그 bash에서 exit해도 메인 프로세스는 그대로라 컨테이너가 Up 상태로 유지된다.
 - `docker attach`는 컨테이너의 **메인 프로세스(PID 1)**에 연결된다. 거기서 exit하면 메인 프로세스가 끝나므로 컨테이너도 Exited가 된다.
@@ -245,6 +251,8 @@ $ docker stats --no-stream
 CONTAINER ID   NAME        CPU %   MEM USAGE / LIMIT     MEM %   NET I/O         BLOCK I/O     PIDS
 2110c6fe125f   my-ubuntu   0.00%   1.707MiB / 7.663GiB   0.02%   1.17kB / 126B   422kB / 0B    1
 ```
+
+![Docker 운영 명령](images/05-docker-ops.png)
 
 - `--name` 없이 실행한 hello-world 컨테이너는 Docker가 `vibrant_elgamal`이라는 이름을 자동으로 붙였다.
 - `docker logs`에는 컨테이너 안에서 입력한 명령과 출력이 그대로 기록된다.
@@ -316,6 +324,9 @@ $ docker logs my-web-8080
 - 같은 이미지로 호스트 포트만 다르게(8080, 8081) 두 컨테이너를 동시에 실행했다.
 - 로그의 `"Wget"`(30초 간격)은 HEALTHCHECK, `172.17.0.1 ... curl`은 호스트에서 포트 매핑을 거쳐 들어온 요청이다.
 
+![포트 매핑 실행과 curl 응답](images/07-port-run.png)
+![healthy 상태와 접속 로그](images/07-healthy-logs.png)
+
 ![localhost:8080 접속](images/port-8080.png)
 ![localhost:8081 접속](images/port-8081.png)
 
@@ -336,7 +347,9 @@ $ docker exec my-web-bind cat /usr/share/nginx/html/index.html
 
 이미지를 다시 빌드하지 않았는데도 호스트에서 고친 파일이 컨테이너에 바로 반영됐다. 바인드 마운트 없이 실행한 8080 컨테이너는 빌드 시점에 복사된 원래 페이지를 그대로 보여준다. 실습 후 백업해 둔 원본으로 `app/index.html`을 되돌렸다.
 
-<!-- 캡처: images/08-bind-before.png, images/08-bind-after.png --->
+![바인드 마운트 터미널 (변경 전/후 curl)](images/08-bind-terminal.png)
+![8082 변경 전](images/08-bind-before.png)
+![8082 변경 후](images/08-bind-after.png)
 
 ### 5-9. 볼륨 영속성
 
@@ -360,6 +373,8 @@ $ docker run -d --name vol-test2 -v mydata:/data ubuntu sleep infinity
 $ docker exec vol-test2 cat /data/hello.txt
 hello volume                             # 새 컨테이너에서도 데이터 유지
 ```
+
+![볼륨 영속성 검증](images/09-volume.png)
 
 ### 5-10. Git 설정 및 GitHub 연동
 
@@ -390,6 +405,10 @@ To https://github.com/haegirl23-max/codyssey_test.git
 branch 'main' set up to track 'origin/main'.
 ```
 
+![git config --list](images/10-git-config.png)
+![첫 커밋](images/10-git-commit.png)
+![GitHub push 성공](images/10-git-push.png)
+
 - 공개 저장소이므로 개인 이메일 대신 GitHub noreply 주소를 사용했다.
 - 인증은 GitHub 비밀번호가 아닌 Personal Access Token으로 했고, 토큰은 문서와 캡처에 남기지 않았다.
 
@@ -416,17 +435,24 @@ branch 'main' set up to track 'origin/main'.
 - **확인**: 플러그인 경로가 `C:\Program Files\Docker\...`로 표시됨. Docker Desktop › Settings › Resources › WSL Integration에서 Ubuntu가 꺼져 있었음
 - **해결**: Ubuntu 연동을 켜고 Apply & restart. 이후 경로가 `/usr/local/lib/docker/...`로 바뀌고 `docker info`에 Server 정보가 정상 출력됨
 
+![WSL Integration 오류 (해결 전)](images/ts1-wsl-before.png)
+![연동 후 hello-world 성공 (해결 후)](images/05-hello-world.png)
+
 ### 문제 2: 컨테이너를 삭제한 뒤 볼륨 데이터가 사라진 것처럼 보임
 - **문제**: 새 컨테이너 `vol-test2`에서 `cat /data/hello.txt` 실행 시 `No such file or directory`
 - **원인 가설**: 첫 컨테이너를 만들 때 볼륨 이름을 잘못 입력해 다른 볼륨에 저장됨
 - **확인**: 첫 실행 명령이 `-v madata:/data`(mydata 오타)였음. Docker는 없는 볼륨 이름을 받으면 오류 없이 새 볼륨을 자동 생성함. `docker volume ls`에서 `madata` 볼륨을 발견했고, `madata`를 새 컨테이너에 연결하자 `hello volume`이 그대로 있었음
 - **해결**: 잘못 생성된 컨테이너와 `madata` 볼륨을 삭제하고 `mydata`로 다시 실행해 영속성 확인. Tab 자동완성으로 이름 오타를 방지
 
+![madata 오타로 데이터가 없어 보이는 화면](images/ts2-volume-madata.png)
+
 ### 문제 3: git push가 거부됨
 - **문제**: `git push` 시 `! [rejected] main -> main (fetch first)`
 - **원인 가설**: GitHub에서 저장소를 만들 때 자동 생성된 커밋이 원격에만 있어서, Git이 덮어쓰기를 막음
 - **확인**: GitHub 저장소 페이지에서 내가 올리지 않은 자동 생성 파일을 확인
 - **해결**: 원격 내용이 버려도 되는 자동 생성 파일뿐이라 `git push -u origin main --force`로 내 커밋을 올림. 협업 저장소라면 `git pull`로 먼저 합쳐야 함
+
+![push rejected](images/ts3-push-rejected.png)
 
 ### 그 밖에 겪은 문제
 - `cat .etc/os-release` → `No such file`: `/etc`(절대 경로)를 `.etc`(상대 경로의 숨김 폴더)로 잘못 입력
