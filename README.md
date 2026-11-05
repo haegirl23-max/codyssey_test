@@ -477,19 +477,29 @@ hello volume                             # 새 컨테이너에서도 데이터 �
 - 권한 확인: 컨테이너 안에서 `ls -l /data`로 파일 소유자를 본다. 컨테이너를 root가 아닌 사용자로 실행하면 root가 만든 파일에 쓰기 권한이 없어 `Permission denied`가 날 수 있다.
 - 사용 중 확인: 컨테이너가 연결된 볼륨은 `docker volume rm`이 거부된다. `docker ps -a --filter volume=mydata`로 어떤 컨테이너가 쓰는지 찾는다.
 
-볼륨 백업/복원 절차 (권장):
+**볼륨 백업과 복원**
 
 ```bash
 # 백업: 임시 컨테이너로 볼륨 내용을 현재 폴더의 tar 파일로 묶기
-docker run --rm -v mydata:/data -v "$(pwd)":/backup ubuntu tar czf /backup/mydata-backup.tgz -C /data .
+$ docker run --rm -v mydata:/data -v "$(pwd)":/backup ubuntu tar czf /backup/mydata-backup.tgz -C /data .
+$ ls -l mydata-backup.tgz
+-rw-r--r-- 1 root root 158 Nov  5 10:29 mydata-backup.tgz
 
 # 복원: 새 볼륨을 만들고 tar 파일을 풀어 넣기
-docker volume create mydata-restore
-docker run --rm -v mydata-restore:/data -v "$(pwd)":/backup ubuntu tar xzf /backup/mydata-backup.tgz -C /data
-docker run --rm -v mydata-restore:/data ubuntu cat /data/hello.txt
+$ docker volume create mydata-restore
+mydata-restore
+$ docker run --rm -v mydata-restore:/data -v "$(pwd)":/backup ubuntu tar xzf /backup/mydata-backup.tgz -C /data
+$ docker run --rm -v mydata-restore:/data ubuntu cat /data/hello.txt
+hello volume                             # 새 볼륨에 데이터가 복원됨
+
+$ rm mydata-backup.tgz                   # 백업 파일은 저장소에 올리지 않도록 삭제
 ```
 
-`--rm`을 붙인 임시 컨테이너가 볼륨과 현재 폴더를 동시에 연결해 파일을 옮기는 방식이다. 백업 파일에는 데이터가 그대로 들어 있으므로 Git 저장소에 올리지 않는다.
+![볼륨 백업과 복원](images/09-volume-backup.png)
+
+- `--rm`을 붙인 임시 컨테이너가 볼륨과 현재 폴더를 동시에 연결해 파일을 옮긴다. 작업이 끝나면 컨테이너는 자동으로 지워진다.
+- 백업 파일의 소유자가 `hyejin`이 아니라 `root`로 만들어졌다. 컨테이너가 root로 실행되어 바인드 마운트한 호스트 폴더에 root 소유 파일을 쓴 것이다. 그래서 `rm` 시 `write-protected` 확인을 묻는다. 필요하면 `docker run --user "$(id -u):$(id -g)" ...`로 내 사용자 권한으로 실행해 이 문제를 피할 수 있다.
+- 실행 중 겪은 실수: 따옴표를 닫지 않아 `>` 대기 상태가 되어 `Ctrl+C`로 취소했고, `tello.txt` 오타와 `rm my data-backup.tgz`(띄어쓰기로 파일이 둘로 해석됨)도 있었다. 화면 캡처에 그대로 남겨 두었다.
 
 ### 5-10. Git 설정 및 GitHub 연동
 
